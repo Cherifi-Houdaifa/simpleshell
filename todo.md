@@ -1,0 +1,4 @@
+- add basic command running functionallity
+- add && and || shell oprators
+- add shell redirection (> and >>)
+- add piping
