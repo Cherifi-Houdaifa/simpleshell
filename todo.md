@@ -1,4 +1,4 @@
-- add basic command running functionallity
-- add && and || shell oprators
-- add shell redirection (> and >>)
-- add piping
+- [x] add basic command running functionallity
+- [x] add && and || shell oprators
+- [x] add shell redirection (> and >>)
+- [] add piping

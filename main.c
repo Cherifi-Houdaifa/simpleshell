@@ -10,8 +10,8 @@
 
 enum tokentype {
     cmd,
-    and,
-    or,
+    and, // &&
+    or, //  ||
     nop,
     redirectwrite,  // >
     redirectapprend // >>
@@ -127,6 +127,9 @@ void parsecommands() {
                 temp2->next->next = NULL;
             }
             cmdstart = temp->next->next;
+
+            // temp->next points to the operator token, we don't need it anymore
+            free(temp->next);
             temp->next = NULL;
             temp = cmdstart;
             continue;
@@ -212,6 +215,7 @@ void runcommands() {
             int status;
             waitpid(pid, &status, 0);
             close(redirectfd);
+            free(argv);
             
             if (WIFEXITED(status)) {
                 exitcode = WEXITSTATUS(status);
@@ -231,15 +235,49 @@ void runcommands() {
 
 
 int main (int argc, char *argv[]) {   
-    char* cmdstr = NULL;
-    size_t len;
-    if (getline(&cmdstr, &len, stdin) == -1) {
-        perror("getline");
-    }
+    setbuf(stdin, 0);
+    setbuf(stdout, 0);
+    setbuf(stderr, 0);
 
-    lexcommands(cmdstr, len);
-    parsecommands();
-    runcommands();
+    
+
+    char* cmdstr = NULL;
+    size_t len = 0;
+    
+
+    while (true) {
+        printf("$ ");
+        if (getline(&cmdstr, &len, stdin) == -1) {
+            perror("getline");
+        }
+
+        lexcommands(cmdstr, len);
+        parsecommands();
+        runcommands();
+
+        // free the commands and tokens
+        // more like free only commands since it include items from tokens  
+        tokens = NULL;
+        struct cmd* i = commands;
+        while (i != NULL) {
+            struct cmdtoken* j = i->command;
+            struct cmdtoken* temp1;
+            while (j != NULL) {
+                temp1 = j;
+                j = j->next;
+                free(temp1);
+            }
+
+            struct cmd* temp2 = i;
+            i = i->next;
+            free(temp2);
+        }
+        free(cmdstr);
+        cmdstr = NULL;
+        len = 0;
+        commands = NULL;
+    }
+    
 
     return 0;
 }

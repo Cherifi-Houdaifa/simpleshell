@@ -1,10 +1,10 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g
 
-main: main.c
+main.out: main.c
 	$(CC) $(CFLAGS) main.c -o main.out
 
-run: main
+run: main.out
 	./main.out
 
 clean:
