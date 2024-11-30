@@ -5,12 +5,16 @@
 #include <sys/types.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 enum tokentype {
     cmd,
     and,
     or,
-    nop
+    nop,
+    redirectwrite,  // >
+    redirectapprend // >>
 };
 
 struct cmdtoken {
@@ -48,6 +52,10 @@ void lexcommands(char* cmdstr, size_t len) {
                 type = and;
             } else if (strcmp(currentstr, "||") == 0) {
                 type = or;
+            } else if (strcmp(currentstr, ">") == 0) {
+                type = redirectwrite;
+            } else if (strcmp(currentstr, ">>") == 0) {
+                type = redirectapprend;
             } else {
                 type = cmd;
             }
@@ -152,27 +160,59 @@ void parsecommands() {
 void runcommands() {
     int exitcode = 0;
     struct cmd* i = commands;
-    
     while (i != NULL) {
         size_t cmdlen = 0;
-        for (struct cmdtoken* j = i->command; j != NULL; j = j->next)
+        char* redirectpath = NULL;
+        int redirectfd = -1;
+        enum tokentype redirecttype;
+        
+        
+        for (struct cmdtoken* j = i->command; j != NULL; j = j->next) {
+            if (j->type == redirectwrite || j->type == redirectapprend) {
+                if (j->next == NULL) {
+                    perror("you have to add redirection path");
+                }
+                if (j->next->next != NULL) {
+                    perror("you can't have anything after the redirect path");
+                }
+                redirectpath = j->next->value;
+                redirecttype = j->type;
+                break;
+            }
             cmdlen++;
+        }
         char** argv = malloc(sizeof(char*) * (cmdlen + 1));
         const char* path = i->command->value;
         size_t index = 0;
-        for (struct cmdtoken* j = i->command; j != NULL; j = j->next) {
+        for (struct cmdtoken* j = i->command; j != NULL && index < cmdlen; j = j->next) {
             argv[index] = j->value;
             index++;
         }
         argv[index] = NULL;
+        
+        if (redirectpath != NULL) {
+            if (redirecttype == redirectwrite) {
+                redirectfd = open(redirectpath, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+            } else if (redirecttype == redirectapprend) {
+                redirectfd = open(redirectpath, O_CREAT | O_WRONLY | O_APPEND, 0644);
+            }
+        }
+        
+        
         pid_t pid = fork();
         if (pid == 0) {
             // in child
+            if (redirectfd != -1) {
+                dup2(redirectfd, 1);
+            }
             execvp(path, argv);
+            perror("execvp: ");
         } else {
             // in parent
             int status;
             waitpid(pid, &status, 0);
+            close(redirectfd);
+            
             if (WIFEXITED(status)) {
                 exitcode = WEXITSTATUS(status);
             }
@@ -190,8 +230,7 @@ void runcommands() {
 }
 
 
-int main (int argc, char *argv[]) {
-    
+int main (int argc, char *argv[]) {   
     char* cmdstr = NULL;
     size_t len;
     if (getline(&cmdstr, &len, stdin) == -1) {

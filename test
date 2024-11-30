@@ -1,0 +1,12 @@
+.
+..
+.gdb_history
+.git
+.gitignore
+main.c
+main.out
+Makefile
+README.md
+test
+todo.md
+.vscode
